@@ -34,13 +34,18 @@ wsServer.on("connection", (client, req) => {
 
     if (data.type == 'chat_message') {
       const nickname = clients.get(client) || nomAleatori;
-      broadcast(JSON.stringify({ type: "chat_message", nickname, message: data.message }));
+      broadcast(JSON.stringify({ type: "chat_message", nickname, message: data.message, time: Date.now() }));
+    }
+
+    if (data.type === "veto_words") {
+      vetoedWords = data.words.map((w) => w.toLowerCase());
+      broadcast({ type: "vetoed_words", words: vetoedWords });
     }
 
   });
 });
 
-// ~ Funciones útiles (WS)
+// ~ Funcions útils (WS)
 
 /**
  * Enviar missatge a tots els clients (Brodcast)
@@ -48,7 +53,7 @@ wsServer.on("connection", (client, req) => {
  * @param {*} clientExclos Els clients esclosos
  */
 function broadcast(missatge, clientExclos) {
-  const data = typeof msg === 'string' ? msg : JSON.stringify(missatge);
+  const data = typeof missatge == "string" ? missatge : JSON.stringify(missatge);
   wsServer.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN && client !== clientExclos)
       client.send(data);
@@ -72,6 +77,63 @@ function randomNickname() {
 function getOnlinePlayers() {
   const nicknames = Array.from(clients.values());
   broadcast(JSON.stringify({ type: 'user_list', users: nicknames }));
+}
+
+// ~ Funciones (JOC)
+
+/**
+ * Enum per controlar el estat del joc
+ */
+const GameState = {
+  WAITING: "waiting", // ~ Sala de espera
+  STARTED: "started", // ~ Partida en curs
+  FINISHED: "finished", // ~ Partida finalitzada
+};
+
+// ~ Dades del joc
+let gameData = {};
+let vetoedWords = [];
+let gameState = GameState.WAITING;
+
+/**
+ * Funció enviar totes les palabras a tots els jugadors
+ */
+function broadcastWords() {
+  broadcast({ type: "update_words", gameData });
+}
+
+/**
+ * Funció per inicialitzar el joc amb la lletra corresponent
+ * @param {*} letter La lletra que es jugará en la partida.
+ */
+function startGame(letter) {
+  gameState = GameState.STARTED;
+  gameData = {};
+  broadcast({ type: "start_game", letter });
+}
+
+/**
+ * Funció per enviar la paraula i guardar-ho
+ * @param {} client El jugador que envía la paraula
+ * @param {*} field El camp de la paraula
+ * @param {*} word El contingut del camp (la paraula)
+ */
+function sendWord(client, field, word) {
+  if (gameState !== GameState.STARTED) return;
+  const nickname = clients.get(client);
+
+  if (!gameData[nickname]) gameData[nickname] = {};
+  gameData[nickname][field] = word;
+}
+
+/**
+ * Funció per finalitzar el joc i mostrar totes les paraulas
+ * @param {*} winner El jugador que ha guanyat
+ */
+function endGame(winner) {
+  gameState = GameState.FINISHED;
+  broadcast({ type: "show_all_words", gameData });
+  broadcast({ type: "stop_game", winner })
 }
 
 /*

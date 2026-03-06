@@ -1,0 +1,25 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Basta Ya! - Lobby</title>
+    <link rel="stylesheet" href="css/lobby.css">
+</head>
+<body>
+    <div id="lobby" class="lobby">
+        <h1>Lobby</h1>
+        <p>Esperando a que otros jugadores se unan...</p>
+        <div id="columnsRow">
+            <div id="playerCol">
+                <ul id="playerList"></ul>
+            </div>
+            <div id="chatCol">
+                <textarea id="chatMessages" readonly></textarea>
+                <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
+                <button id="sendChatButton">Enviar</button>
+            </div>
+        </div>
+        <button id="startGameButton" disabled>Iniciar Juego</button>
+    </div>
+</body>
+</html>

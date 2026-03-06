@@ -1,0 +1,118 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #7b7b7b;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#gameWrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+    gap: 20px;
+}
+
+/* --- Sección de la letra --- */
+#letterSection {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+#letterCircle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #af4c4c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+#currentLetter {
+    font-size: 56px;
+    font-weight: bold;
+    color: white;
+    text-transform: uppercase;
+}
+
+/* --- Columnas --- */
+#columnsRow {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+#playerCol {
+    flex: 1;
+    background-color: #636363;
+    border-radius: 10px;
+    padding: 15px;
+    color: white;
+    box-sizing: border-box;
+    overflow-y: auto;
+    align-self: stretch;
+}
+
+#playerCol h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+    padding-bottom: 8px;
+}
+
+#playerList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#gameCol {
+    flex: 4;
+    background-color: #636363;
+    border-radius: 10px;
+    padding: 15px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    align-self: stretch;
+}
+
+/* --- Botón Basta Ya --- */
+#buttonRow {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+#bastaYaButton {
+    padding: 14px 60px;
+    background-color: #af4c4c;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transition: background-color 0.2s, opacity 0.2s;
+}
+
+#bastaYaButton:not(:disabled) {
+    cursor: pointer;
+    opacity: 1;
+}
+
+#bastaYaButton:not(:disabled):hover {
+    background-color: #ff2121;
+}

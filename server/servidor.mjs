@@ -1,47 +1,84 @@
-/******************************************************************************
- *					SERVIDOR WEB SOCKETS (port 8180)
- ******************************************************************************/
+/*
+────────────────────────────
+📦 Servidor WS | 8180
+──────────────────────────── 
+*/
 
-// Afegir el mòdul 'ws'
 import WebSocket, { WebSocketServer } from "ws";
+const clients = new Map();
 
-// Crear servidor WebSockets i escoltar en el port 8180
 const wsServer = new WebSocketServer({ port: 8180 });
-console.log("Servidor WebSocket escoltant en http://localhost:8180");
+console.log("📦 Servidor WS (Nodo): http://localhost:8180");
 
-// Enviar missatge a tothom excepte a 'clientExclos'
-//	(si no s'especifica qui és el 'clientExclos', s'envia a tots els clients)
-function broadcast(missatge, clientExclos) {
-  wsServer.clients.forEach(function each(client) {
-    if (client.readyState === WebSocket.OPEN && client !== clientExclos) {
-      client.send(missatge);
-    }
-  });
-}
+/**
+ * Listener de nueva connexió
+ * Es dispara quan un client es conecta
+ */
+wsServer.on("connection", (client, req) => {
+  // ~ Guardar el client amb un nick aleatori
+  const nomAleatori = randomNickname();
+  clients.set(client, nomAleatori);
+  broadcast(nomAleatori + " s'ha connectat.");
 
-// Al rebre un nou client (nova connexió)
-wsServer.on("connection", (client, peticio) => {
-  // Guardar identificador (IP i Port) del nou client
-  let id = peticio.socket.remoteAddress + ":" + peticio.socket.remotePort;
+  // ~ Actualitzar llista d'usuaris connectats
+  getOnlinePlayers();
 
-  // Enviar salutació al nou client
-  //	i avisar a tots els altres que s'ha afegit un nou client
-  client.send(`Benvingut <strong>${id}</strong>`);
-  broadcast(`Nou client afegit: ${id}`, client);
-  console.log(`Benvingut ${id}`);
-  console.log(`Nou client afegit: ${id}`);
-
-  // Al rebre un missatge d'aques client
-  //	reenviar-lo a tothom (inclòs ell mateix)
+  // ~ Enviar missatges segons el tipus
   client.on("message", (missatge) => {
-    broadcast(`<strong>${id}: </strong>${missatge}`);
-    console.log(`Missatge de ${id} --> ${missatge}`);
+    const data = JSON.parse(missatge);
+
+    if (data.type === 'set_nickname') {
+      clients.set(client, data.nickname);
+      broadcast(JSON.stringify({ type: "update_nickname", nickname: data.nickname }));
+    }
+
+    if (data.type == 'chat_message') {
+      const nickname = clients.get(client) || nomAleatori;
+      broadcast(JSON.stringify({ type: "chat_message", nickname, message: data.message }));
+    }
+
   });
 });
 
-/******************************************************************************
- *						SERVIDOR WEB (port 8080)
- ******************************************************************************/
+// ~ Funciones útiles (WS)
+
+/**
+ * Enviar missatge a tots els clients (Brodcast)
+ * @param {*} missatge El missatge a enviar
+ * @param {*} clientExclos Els clients esclosos
+ */
+function broadcast(missatge, clientExclos) {
+  const data = typeof msg === 'string' ? msg : JSON.stringify(missatge);
+  wsServer.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN && client !== clientExclos)
+      client.send(data);
+  });
+}
+
+/**
+ * Función per crear un nom aleatori amb 5 números.
+ * @returns Retorna el missatge amb els 5 dígits.
+ */
+function randomNickname() {
+  let nums = "", nickname = "Anònim";
+  for (let i = 0; i < 5; i++) nums += Math.floor(Math.random() * 5);
+  console.log(nickname + nums);
+  return nickname + nums;
+}
+
+/**
+ * Funció per enviar tots els jugadors connectats
+ */
+function getOnlinePlayers() {
+  const nicknames = Array.from(clients.values());
+  broadcast(JSON.stringify({ type: 'user_list', users: nicknames }));
+}
+
+/*
+─────────────────────────────
+📦 Servidor (Backend) | 8080
+───────────────────────────── 
+*/
 
 import { createServer } from "http";
 import { parse } from "url";
@@ -54,12 +91,10 @@ function header(resposta, codi, cType) {
   else resposta.writeHead(codi);
 }
 
-function enviarArxiu(resposta, dades, filename, cType, err) {
+function enviarArxiu(resposta, dades, cType, err) {
   if (err) {
     header(resposta, 400, "text/html");
-    resposta.end(
-      "<p style='text-align:center;font-size:1.2rem;font-weight:bold;color:red'>Error al l legir l'arxiu</p>",
-    );
+    resposta.end("<p style='text-align:center;font-size:1.2rem;font-weight:bold;color:red'>Error al l legir l'arxiu</p>");
     return;
   }
 
@@ -85,9 +120,9 @@ function onRequest(peticio, resposta) {
 
       if (peticio.method == "GET") {
         let q = parse(peticio.url, true);
-        let filename = "." + q.pathname;
+        let filename = "./public" + q.pathname;
 
-        if (filename == "./") filename += "index.html";
+        if (filename == "./public/") filename += "index.html";
         if (existsSync(filename)) {
           readFile(filename, function (err, dades) {
             enviarArxiu(resposta, dades, filename, undefined, err);
@@ -106,4 +141,4 @@ let server = createServer();
 server.on("request", onRequest);
 
 server.listen(8080);
-console.log("Servidor escoltant en http://localhost:8080");
+console.log("📦 Servidor (Backend): http://localhost:8080");

@@ -3,8 +3,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BastaYA!</title>
+    <style>
+    	div {overflow-y:auto;margin-bottom:1rem;width:20rem;height:30rem;border:solid black 1px;}
+    	textarea {width:20rem;}
+    </style>
+	<script>
+		// Connexió
+		let connexio;
+
+		function init() {
+			// Local o remot
+			let domini;
+			if (window.location.protocol == "file:") domini = "localhost";
+			else domini = window.location.hostname;
+
+			// Creació de la connexió
+			let url = "ws://" + domini + ":8180";
+			connexio = new WebSocket(url);
+
+			// Quan s'obre la connexió, enviar missatge al servidor
+			connexio.onopen = () => {
+				// connexio.send("Hola a tothom!");
+			}
+
+			// Quan arriba un missatge, mostrar-lo per consola
+			connexio.onmessage = e => {
+				let d = document.querySelector('div');
+				d.innerHTML += "<p>" + e.data + "</p>";
+				d.scroll(0,d.scrollHeight);
+			}
+			
+			// Quan es produeix un error, mostrar-lo per consola
+			connexio.onerror = error => {
+				alert("Error en la connexió: " + error);
+			}
+		}
+
+		// Enviar missatge
+		function enviar(ev) {
+			let missatge = document.getElementById("missatge");
+			connexio.send(missatge.value.replace(/\r\n|\r|\n/g,"<br>"));
+			missatge.value = "";
+			missatge.focus();
+			if (ev) ev.preventDefault();
+		}
+		
+		function enter(ev) {
+			let key = window.event.keyCode;
+
+			if (key === 13 && !ev.shiftKey) {
+				enviar();
+				ev.preventDefault();
+				return false;
+			}
+			else {
+				return true;
+			}
+		}
+	</script>
 </head>
-<body>
-    
+<body onload="init()">
+    <div></div>
+	<form onsubmit="enviar(event)">
+		<textarea id="missatge" rows="3" onkeypress="enter(event)" placeholder="Escriu aquí el missatge" autofocus></textarea>
+	</form>
 </body>
 </html>

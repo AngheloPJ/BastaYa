@@ -88,7 +88,51 @@ body {
     align-self: stretch;
 }
 
-/* --- Botón Basta Ya --- */
+/* --- Grid de categorías --- */
+#categoriesGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.categoryCard {
+    background-color: #7b7b7b;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.categoryLabel {
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: white;
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+    font-size: clamp(14px, 2vw, 28px);
+}
+
+.categoryInput {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 5px;
+    border: none;
+    background-color: #9a9a9a;
+    color: white;
+    font-size: 14px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.categoryInput:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
 #buttonRow {
     width: 100%;
     display: flex;

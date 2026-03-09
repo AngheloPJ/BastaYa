@@ -20,6 +20,9 @@ wsServer.on("connection", (client, req) => {
   clients.set(client, nomAleatori);
   broadcast(nomAleatori + " s'ha connectat.");
 
+  // ~ Actualitzar llista d'usuaris connectats
+  getOnlinePlayers();
+
   // ~ Enviar missatges segons el tipus
   client.on("message", (missatge) => {
     const data = JSON.parse(missatge);
@@ -142,19 +145,6 @@ function endGame(winner) {
 import { createServer } from "http";
 import { parse } from "url";
 import { existsSync, readFile } from "fs";
-import { extname } from "path";
-
-const MIME_TYPES = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".gif": "image/gif",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-};
 
 function header(resposta, codi, cType) {
   resposta.setHeader("Access-Control-Allow-Origin", "*");
@@ -196,9 +186,8 @@ function onRequest(peticio, resposta) {
 
         if (filename == "./public/") filename += "index.html";
         if (existsSync(filename)) {
-          const cType = MIME_TYPES[extname(filename)] || "application/octet-stream";
           readFile(filename, function (err, dades) {
-            enviarArxiu(resposta, dades, cType, err);
+            enviarArxiu(resposta, dades, filename, undefined, err);
           });
         } else {
           header(resposta, 404, "text/html");

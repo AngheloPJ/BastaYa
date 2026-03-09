@@ -1,0 +1,161 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #7b7b7b;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#scoresWrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+    gap: 20px;
+}
+
+/* --- Título --- */
+#scoresHeader {
+    flex-shrink: 0;
+    text-align: center;
+}
+
+#scoresTitle {
+    margin: 0;
+    font-size: clamp(24px, 3.5vw, 48px);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: white;
+}
+
+/* --- Panel de puntuaciones --- */
+#scoresPanel {
+    flex: 1;
+    width: 100%;
+    background-color: #636363;
+    border-radius: 10px;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#scoresTable {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+/* --- Filas --- */
+.scoresRow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    background-color: #7b7b7b;
+    border-radius: 10px;
+    padding: 14px 20px;
+    flex: 1;
+    min-height: 0;
+    transition: background-color 0.2s;
+}
+
+.scoresRow.header {
+    background-color: #4f4f4f;
+    flex: 0 0 auto;
+    padding: 10px 20px;
+}
+
+.scoresRow.first {
+    background-color: #8a6a2a;
+    border: 2px solid #f0c040;
+}
+
+.scoresRow.second {
+    background-color: #5a5a5a;
+    border: 2px solid #c0c0c0;
+}
+
+.scoresRow.third {
+    background-color: #6b3d2a;
+    border: 2px solid #cd7f32;
+}
+
+/* --- Celdas --- */
+.scoresCell {
+    color: white;
+    font-weight: bold;
+}
+
+.scoresCell.rank {
+    width: 60px;
+    font-size: clamp(18px, 2.5vw, 32px);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.scoresRow.header .scoresCell.rank {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+}
+
+.scoresCell.player {
+    flex: 1;
+    font-size: clamp(16px, 2vw, 28px);
+    padding-left: 10px;
+}
+
+.scoresRow.header .scoresCell.player {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+}
+
+.scoresCell.points {
+    width: 100px;
+    text-align: right;
+    font-size: clamp(18px, 2.5vw, 32px);
+    flex-shrink: 0;
+    color: #f5a0a0;
+}
+
+.scoresRow.header .scoresCell.points {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+    color: white;
+}
+
+/* --- Botón --- */
+#buttonRow {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#playAgainButton {
+    padding: 14px 60px;
+    background-color: #af4c4c;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#playAgainButton:hover {
+    background-color: #ff2121;
+}

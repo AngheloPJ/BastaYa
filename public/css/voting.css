@@ -1,0 +1,117 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #7b7b7b;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#votingWrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+    gap: 20px;
+}
+
+/* --- Panel central --- */
+#votingPanel {
+    flex: 1;
+    width: 100%;
+    background-color: #636363;
+    border-radius: 10px;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+}
+
+/* --- Título de categoría --- */
+#categoryTitle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+#categoryName {
+    font-size: clamp(20px, 3vw, 36px);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: white;
+}
+
+/* --- Grid de respuestas --- */
+#answersGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    flex: 1;
+    min-height: 0;
+}
+
+.answerButton {
+    background-color: #7b7b7b;
+    color: white;
+    font-size: clamp(14px, 1.8vw, 22px);
+    font-weight: bold;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
+    width: 100%;
+    height: 100%;
+}
+
+.answerButton:hover {
+    background-color: #8f8f8f;
+    transform: scale(1.02);
+}
+
+.answerButton.selected {
+    background-color: #af4c4c;
+    border-color: #ff2121;
+}
+
+.answerButton.rejected {
+    background-color: #4a4a4a;
+    border-color: #2a2a2a;
+    opacity: 0.5;
+}
+
+/* --- Botón de acción --- */
+#buttonRow {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#actionButton {
+    padding: 14px 60px;
+    background-color: #af4c4c;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#actionButton:hover {
+    background-color: #ff2121;
+}
+
+#actionButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

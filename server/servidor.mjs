@@ -25,7 +25,12 @@ wsServer.on("connection", (client, req) => {
 
   // ~ Enviar missatges segons el tipus
   client.on("message", (missatge) => {
-    const data = JSON.parse(missatge);
+    let data;
+    try {
+      data = JSON.parse(missatge);
+    } catch {
+      return;
+    }
 
     if (data.type === 'set_nickname') {
       clients.set(client, data.nickname);
@@ -143,8 +148,21 @@ function endGame(winner) {
 */
 
 import { createServer } from "http";
-import { parse } from "url";
+
 import { existsSync, readFile } from "fs";
+import { extname } from "path";
+
+const MIME_TYPES = {
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "application/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+};
 
 function header(resposta, codi, cType) {
   resposta.setHeader("Access-Control-Allow-Origin", "*");
@@ -181,13 +199,14 @@ function onRequest(peticio, resposta) {
       });
 
       if (peticio.method == "GET") {
-        let q = parse(peticio.url, true);
+        const q = new URL(peticio.url, "http://" + peticio.headers.host);
         let filename = "./public" + q.pathname;
 
         if (filename == "./public/") filename += "index.html";
         if (existsSync(filename)) {
+          const cType = MIME_TYPES[extname(filename)] || "application/octet-stream";
           readFile(filename, function (err, dades) {
-            enviarArxiu(resposta, dades, filename, undefined, err);
+            enviarArxiu(resposta, dades, cType, err);
           });
         } else {
           header(resposta, 404, "text/html");

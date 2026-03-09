@@ -6,7 +6,6 @@ const nicknameInput = document.getElementById('playerName') as HTMLInputElement;
 playButton.addEventListener('click', play);
 
 function play() {
-    connexio.send('connection');
     if (nicknameInput.value.trim() !== '') {
         let jsonData = JSON.stringify({ type: "set_nickname", nickname: nicknameInput.value });
         connexio.send(jsonData);

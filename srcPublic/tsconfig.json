@@ -5,8 +5,6 @@
     "types": [],
     "strict": true,
     "noImplicitAny": true,
-    "sourceMap": true,
-    "inlineSources": true,
     "noEmitOnError": true,
     "allowJs": false,
     "rootDir": ".",

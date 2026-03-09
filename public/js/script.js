@@ -1,14 +1,20 @@
-"use strict";
-let connexio = new WebSocket('ws://localhost:8180');
+const connexio = new WebSocket('ws://localhost:8180');
 const playButton = document.getElementById('playButton');
 const nicknameInput = document.getElementById('playerName');
 playButton.addEventListener('click', play);
+function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    if (document.getElementById('page-' + pageId) !== null) {
+        document.getElementById('page-' + pageId).classList.add('active');
+    }
+}
 function play() {
-    connexio.send('connection');
     if (nicknameInput.value.trim() !== '') {
         let jsonData = JSON.stringify({ type: "set_nickname", nickname: nicknameInput.value });
         connexio.send(jsonData);
     }
-    window.location.href = 'lobby.html';
+    showPage("lobby");
 }
-//# sourceMappingURL=script.js.map
+export function getConnexio() {
+    return connexio;
+}

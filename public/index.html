@@ -1,17 +1,137 @@
-<html lang="ca">
+<!DOCTYPE html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>¡Basta Ya!</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="js/script.js" defer></script>
 </head>
 <body>
-    <div id="mainMenu" class="mainMenu">
-        <h1>¡Basta Ya!</h1>
-        <label for="playerName">Nombre del jugador:</label>
-        <input type="text" id="playerName" name="playerName" placeholder="Introduce tu nombre">
-        <button id="playButton">Jugar</button>
+
+    <!-- ==================== MENÚ PRINCIPAL ==================== -->
+    <div id="page-menu" class="page active">
+        <div class="mainMenu">
+            <h1>¡Basta Ya!</h1>
+            <label for="playerName">Nombre del jugador:</label>
+            <input type="text" id="playerName" placeholder="Introduce tu nombre">
+            <button id="playButton">Jugar</button>
+        </div>
     </div>
+
+    <!-- ==================== LOBBY ==================== -->
+    <div id="page-lobby" class="page">
+        <div class="lobby">
+            <h1>Lobby</h1>
+            <p>Esperando a que otros jugadores se unan...</p>
+            <div id="lobby-columnsRow">
+                <div id="playerCol">
+                    <ul id="playerList"></ul>
+                </div>
+                <div id="chatCol">
+                    <textarea id="chatMessages" readonly></textarea>
+                    <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
+                    <button id="sendChatButton">Enviar</button>
+                </div>
+            </div>
+            <button id="startGameButton" disabled>Iniciar Juego</button>
+        </div>
+    </div>
+
+    <!-- ==================== JUEGO ==================== -->
+    <div id="page-game" class="page">
+        <div id="letterSection">
+            <div id="letterCircle">
+                <span id="currentLetter">A</span>
+            </div>
+        </div>
+        <div id="game-columnsRow">
+            <div id="game-playerCol">
+                <h3>Jugadores</h3>
+                <ul id="game-playerList"></ul>
+            </div>
+            <div id="gameCol">
+                <div id="categoriesGrid">
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                    <div class="categoryCard"><label class="categoryLabel"></label><input type="text" class="categoryInput" disabled></div>
+                </div>
+            </div>
+        </div>
+        <div id="game-buttonRow">
+            <button id="bastaYaButton" disabled>¡Basta Ya!</button>
+        </div>
+    </div>
+
+    <!-- ==================== VOTACIÓN ==================== -->
+    <div id="page-voting" class="page">
+        <div id="votingPanel">
+            <div id="categoryTitle">
+                <span id="categoryName"></span>
+            </div>
+            <div id="answersGrid">
+                <button class="answerButton"></button>
+                <button class="answerButton"></button>
+                <button class="answerButton"></button>
+                <button class="answerButton"></button>
+                <button class="answerButton"></button>
+                <button class="answerButton"></button>
+            </div>
+        </div>
+        <div id="voting-buttonRow">
+            <button id="actionButton">Confirmar</button>
+        </div>
+    </div>
+
+    <!-- ==================== PUNTUACIÓN FINAL ==================== -->
+    <div id="page-scores" class="page">
+        <div id="scoresHeader">
+            <h1 id="scoresTitle">Puntuación Final</h1>
+        </div>
+        <div id="scoresPanel">
+            <div id="scoresTable">
+                <div class="scoresRow header">
+                    <div class="scoresCell rank">#</div>
+                    <div class="scoresCell player">Jugador</div>
+                    <div class="scoresCell points">Puntos</div>
+                </div>
+                <div class="scoresRow" id="row1">
+                    <div class="scoresCell rank">1</div>
+                    <div class="scoresCell player"></div>
+                    <div class="scoresCell points"></div>
+                </div>
+                <div class="scoresRow" id="row2">
+                    <div class="scoresCell rank">2</div>
+                    <div class="scoresCell player"></div>
+                    <div class="scoresCell points"></div>
+                </div>
+                <div class="scoresRow" id="row3">
+                    <div class="scoresCell rank">3</div>
+                    <div class="scoresCell player"></div>
+                    <div class="scoresCell points"></div>
+                </div>
+                <div class="scoresRow" id="row4">
+                    <div class="scoresCell rank">4</div>
+                    <div class="scoresCell player"></div>
+                    <div class="scoresCell points"></div>
+                </div>
+                <div class="scoresRow" id="row5">
+                    <div class="scoresCell rank">5</div>
+                    <div class="scoresCell player"></div>
+                    <div class="scoresCell points"></div>
+                </div>
+            </div>
+        </div>
+        <div id="scores-buttonRow">
+            <button id="playAgainButton">Volver a Jugar</button>
+        </div>
+    </div>
+
+    <script type="module" src="js/script.js"></script>
 </body>
 </html>

@@ -85,7 +85,7 @@ function randomNickname() {
 /**
  * Funció per enviar tots els jugadors connectats
  */
-function getOnlinePlayers() {
+function broadcastUserList() {
   const users = Array.from(clients.values()).map(c => ({
     nickname: c.nickname,
     isHost: c.isHost

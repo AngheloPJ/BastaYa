@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "types": [],
+    "strict": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "inlineSources": true,
+    "noEmitOnError": true,
+    "allowJs": false,
+    "rootDir": ".",
+    "outDir": "../public/js"
+  },
+  "include": ["*.ts"]
+}

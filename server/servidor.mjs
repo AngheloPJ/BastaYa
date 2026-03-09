@@ -40,7 +40,9 @@ wsServer.on("connection", (client, req) => {
 
     if (data.type === 'set_nickname') {
       clients.set(client, data.nickname);
+      // notify everyone that a nickname changed and send fresh list
       broadcast(JSON.stringify({ type: "update_nickname", nickname: data.nickname }));
+      broadcastUserList();
     }
 
     if (data.type == 'chat_message') {

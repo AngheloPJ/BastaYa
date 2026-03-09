@@ -17,11 +17,17 @@ console.log("📦 Servidor WS (Nodo): http://localhost:8180");
 wsServer.on("connection", (client, req) => {
   // ~ Guardar el client amb un nick aleatori
   const nomAleatori = randomNickname();
-  clients.set(client, nomAleatori);
+  const isFirst = clients.size == 0;
+
+  clients.set(client, { nickname: nomAleatori, isHost: isFirst });
   broadcast(nomAleatori + " s'ha connectat.");
 
-  // ~ Actualitzar llista d'usuaris connectats
-  getOnlinePlayers();
+  client.send(JSON.stringify({
+    type: "host_status",
+    isHost: isFirst
+  }));
+
+  broadcastUserList();
 
   // ~ Enviar missatges segons el tipus
   client.on("message", (missatge) => {
@@ -80,8 +86,12 @@ function randomNickname() {
  * Funció per enviar tots els jugadors connectats
  */
 function getOnlinePlayers() {
-  const nicknames = Array.from(clients.values());
-  broadcast(JSON.stringify({ type: 'user_list', users: nicknames }));
+  const users = Array.from(clients.values()).map(c => ({
+    nickname: c.nickname,
+    isHost: c.isHost
+  }));
+
+  broadcast({ type: 'user_list', users });
 }
 
 // ~ Funciones (JOC)

@@ -1,294 +1,26 @@
-/*
-────────────────────────────
-📦 Servidor WS | 8180
-──────────────────────────── 
-*/
-
 import WebSocket, { WebSocketServer } from "ws";
-const clients = new Map();
+import { createServer } from "http";
+import { existsSync, readFile } from "fs";
+import { extname } from "path";
 
 const wsServer = new WebSocketServer({ port: 8180 });
-console.log("📦 Servidor WS (Nodo): http://localhost:8180");
+const clients = new Map();
 
-let currentCategoryIndex = 0;
-let categoriesInPlay = [];
-let votes = {};
-let confirmations = 0;
-let respuestasRecibidas = 0;
-let esperandoRespuestas = false;
-
-
-/**
- * Listener de nueva connexió
- * Es dispara quan un client es conecta
- */
-wsServer.on("connection", (client, req) => {
-  // ~ Guardar el client amb un nick aleatori
-  const nomAleatori = randomNickname();
-  const isFirst = clients.size == 0;
-
-  clients.set(client, { nickname: nomAleatori, isHost: isFirst });
-  broadcast(nomAleatori + " s'ha connectat.");
-
-  client.send(JSON.stringify({
-    type: "host_status",
-    isHost: isFirst
-  }));
-
-  broadcastUserList();
-
-  // ~ Enviar missatges segons el tipus
-  client.on("message", (missatge) => {
-    let data;
-    try {
-      data = JSON.parse(missatge);
-    } catch {
-      return;
-    }
-
-    if (data.type === 'set_nickname') {
-      // 1. Obtenemos el objeto actual del cliente
-      const usuari = clients.get(client);
-
-      if (usuari) {
-        // 2. Actualizamos solo el nombre
-        usuari.nickname = data.nickname;
-        clients.set(client, usuari);
-      }
-
-      broadcast(JSON.stringify({ type: "update_nickname", nickname: data.nickname }));
-      broadcastUserList();
-    }
-
-    const usuario = clients.get(client);
-
-    if (data.type === 'submit_answers') {
-      // Guardamos las respuestas del jugador (sea o no el que paró)
-      gameData[usuario.nickname] = data.answers;
-
-      // Si es el primero en pulsar "Basta Ya"
-      if (gameState === GameState.STARTED && !esperandoRespuestas) {
-        esperandoRespuestas = true;
-        // Avisamos a todos que se acabó el tiempo para escribir
-        broadcast({ type: "stop_game", winner: usuario.nickname });
-
-        // ESPERAMOS 2 SEGUNDOS antes de empezar las votaciones
-        // para que los 'submit_answers' de los demás tengan tiempo de llegar
-        setTimeout(() => {
-          esperandoRespuestas = false;
-          gameState = GameState.FINISHED;
-          startVotingRound(0); // Empezamos con la primera categoría
-        }, 2000);
-      }
-    }
-
-    if (data.type === 'confirm_vote') {
-      confirmations++;
-
-      // Si todos han confirmado (o la mayoría, depende de tu lógica)
-      if (confirmations >= clients.size) {
-        console.log("Todos confirmaron. Saltando a la siguiente sección...");
-        clearTimeout(votingTimeout); // CANCELAMOS los 15 segundos
-        startVotingRound(currentCategoryIndex + 1); // Saltamos ya
-      }
-    }
-
-    if (data.type == 'chat_message') {
-      const userData = clients.get(client);
-      // Extraemos el nickname del objeto, o usamos el temporal si no tiene
-      const nickname = userData ? userData.nickname : nomAleatori;
-
-      broadcast(JSON.stringify({
-        type: "chat_message",
-        nickname,
-        message: data.message,
-        time: Date.now()
-      }));
-    }
-
-    if (data.type === "veto_words") {
-      vetoedWords = data.words.map((w) => w.toLowerCase());
-      broadcast({ type: "vetoed_words", words: vetoedWords });
-    }
-
-    if (data.type === 'start_game_request') {
-      const usuari = clients.get(client);
-      if (usuari && usuari.isHost) {
-        const lletres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const lletraAleatoria = lletres[Math.floor(Math.random() * lletres.length)];
-
-        startGame(lletraAleatoria);
-      }
-    }
-
-  });
-
-  client.on("close", () => {
-    const usuarioQueSeVa = clients.get(client);
-
-    if (usuarioQueSeVa) {
-      console.log(`${usuarioQueSeVa.nickname} se ha desconectado.`);
-
-      clients.delete(client);
-
-      broadcast(`${usuarioQueSeVa.nickname} ha abandonado la sala.`);
-
-      if (usuarioQueSeVa.isHost && clients.size > 0) {
-        const nextClient = clients.keys().next().value;
-        const nextUserData = clients.get(nextClient);
-        nextUserData.isHost = true;
-        nextClient.send(JSON.stringify({ type: "host_status", isHost: true }));
-      }
-
-      broadcastUserList();
-    }
-  });
-});
-
-// ~ Funcions útils (WS)
-
-/**
- * Enviar missatge a tots els clients (Brodcast)
- * @param {*} missatge El missatge a enviar
- * @param {*} clientExclos Els clients esclosos
- */
-function broadcast(missatge, clientExclos) {
-  const data = typeof missatge == "string" ? missatge : JSON.stringify(missatge);
-  wsServer.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN && client !== clientExclos)
-      client.send(data);
-  });
-}
-
-/**
- * Función per crear un nom aleatori amb 5 números.
- * @returns Retorna el missatge amb els 5 dígits.
- */
-function randomNickname() {
-  let nums = "", nickname = "Anònim";
-  for (let i = 0; i < 5; i++) nums += Math.floor(Math.random() * 5);
-  console.log(nickname + nums);
-  return nickname + nums;
-}
-
-/**
- * Funció per enviar tots els jugadors connectats
- */
-function broadcastUserList() {
-  const users = Array.from(clients.values()).map(c => ({
-    nickname: c.nickname,
-    isHost: c.isHost // Esta propiedad es la clave
-  }));
-
-  broadcast({ type: 'user_list', users });
-}
-
-// ~ Funciones (JOC)
-
-/**
- * Enum per controlar el estat del joc
- */
-const GameState = {
-  WAITING: "waiting", // ~ Sala de espera
-  STARTED: "started", // ~ Partida en curs
-  FINISHED: "finished", // ~ Partida finalitzada
-};
-
-// ~ Dades del joc
+let gameState = 'waiting';
 let gameData = {};
-let vetoedWords = [];
-let gameState = GameState.WAITING;
+let votes = {};
+let categoriesInPlay = [];
+let currentCategoryIndex = 0;
+let confirmations = 0;
+let esperandoRespuestas = false;
+let votingTimeout;
 
-/**
- * Funció enviar totes les palabras a tots els jugadors
- */
-function broadcastWords() {
-  broadcast({ type: "update_words", gameData });
-}
-
-
-// Lista de categorías posibles
 const CATEGORIAS_POOL = [
   "Marcas", "Vehículos", "Comida", "Título de canción/película/libro",
   "Animales", "Países o Ciudades", "Nombres de persona", "Profesiones",
   "Objetos de casa", "Colores", "Frutas o Verduras", "Deportes",
   "Personajes Famosos", "Ropa", "Partes del cuerpo", "Superhéroes"
 ];
-/**
- * Funció per inicialitzar el joc amb la lletra corresponent
- * @param {*} letter La lletra que es jugará en la partida.
- */
-
-function startGame(letter) {
-  gameState = GameState.STARTED;
-  gameData = {};
-  votes = {};
-  currentCategoryIndex = 0;
-
-  categoriesInPlay = [...CATEGORIAS_POOL]
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 9);
-
-  broadcast({ type: "start_game", letter, categories: categoriesInPlay });
-}
-
-function endGame(winner) {
-  gameState = GameState.FINISHED;
-  broadcast({ type: "stop_game", winner, gameData });
-
-  // Iniciamos la primera ronda de votación tras un pequeño delay
-  setTimeout(() => startVotingRound(0), 2000);
-}
-
-let votingTimeout;
-function startVotingRound(index) {
-  if (index >= categoriesInPlay.length) {
-    broadcast({ type: "show_final_scores" });
-    return;
-  }
-
-  currentCategoryIndex = index;
-  confirmations = 0;
-  const category = categoriesInPlay[index];
-
-  broadcast({
-    type: "start_voting_round",
-    category: category,
-    answers: gameData
-  });
-
-  // Guardamos el timeout para poder cancelarlo si le dan a confirmar
-  votingTimeout = setTimeout(() => {
-    startVotingRound(index + 1);
-  }, 15000);
-}
-
-/**
- * Funció per enviar la paraula i guardar-ho
- * @param {} client El jugador que envía la paraula
- * @param {*} field El camp de la paraula
- * @param {*} word El contingut del camp (la paraula)
- */
-function sendWord(client, field, word) {
-  if (gameState !== GameState.STARTED) return;
-  const nickname = clients.get(client);
-
-  if (!gameData[nickname]) gameData[nickname] = {};
-  gameData[nickname][field] = word;
-}
-
-
-
-/*
-─────────────────────────────
-📦 Servidor (Backend) | 8080
-───────────────────────────── 
-*/
-
-import { createServer } from "http";
-
-import { existsSync, readFile } from "fs";
-import { extname } from "path";
 
 const MIME_TYPES = {
   ".html": "text/html",
@@ -302,62 +34,196 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
-function header(resposta, codi, cType) {
-  resposta.setHeader("Access-Control-Allow-Origin", "*");
-  resposta.setHeader("Access-Control-Allow-Methods", "GET");
-  if (cType) resposta.writeHead(codi, { "Content-Type": cType });
-  else resposta.writeHead(codi);
+wsServer.on("connection", (client) => {
+  const nomAleatori = randomNickname();
+  const isFirst = clients.size === 0;
+  clients.set(client, { nickname: nomAleatori, isHost: isFirst, points: 0 });
+
+  client.send(JSON.stringify({ type: "host_status", isHost: isFirst }));
+  broadcastUserList();
+
+  client.on("message", (missatge) => {
+    let data;
+    try { data = JSON.parse(missatge); } catch { return; }
+
+    const usuario = clients.get(client);
+
+    if (data.type === 'set_nickname') {
+      usuario.nickname = data.nickname;
+      clients.set(client, usuario);
+      broadcastUserList();
+    }
+
+    if (data.type === 'chat_message') {
+      broadcast({ type: "chat_message", nickname: usuario.nickname, message: data.message });
+    }
+
+    if (data.type === 'start_game_request' && usuario.isHost) {
+      const lletres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      startGame(lletres[Math.floor(Math.random() * lletres.length)]);
+    }
+
+    if (data.type === 'return_to_lobby' && usuario.isHost) {
+      gameState = 'waiting';
+      gameData = {};
+      votes = {};
+      currentCategoryIndex = 0;
+      confirmations = 0;
+      esperandoRespuestas = false;
+      clearTimeout(votingTimeout);
+      clients.forEach(u => u.points = 0);
+      broadcast({ type: 'return_to_lobby' });
+    }
+
+    if (data.type === 'submit_answers') {
+      gameData[usuario.nickname] = data.answers;
+
+      if (gameState === 'started' && !esperandoRespuestas) {
+        esperandoRespuestas = true;
+        broadcast({ type: "stop_game", winner: usuario.nickname });
+
+        setTimeout(() => {
+          esperandoRespuestas = false;
+          gameState = 'finished';
+          startVotingRound(0);
+        }, 2000);
+      }
+    }
+
+    if (data.type === 'vote_word') {
+      const { targetPlayer, category, isCorrect } = data;
+      if (!votes[targetPlayer]) votes[targetPlayer] = {};
+      if (!votes[targetPlayer][category]) votes[targetPlayer][category] = { voters: new Map() };
+      votes[targetPlayer][category].voters.set(client, isCorrect);
+    }
+
+    if (data.type === 'confirm_vote') {
+      confirmations++;
+      if (confirmations >= clients.size) {
+        clearTimeout(votingTimeout);
+        startVotingRound(currentCategoryIndex + 1);
+      }
+    }
+  });
+
+  client.on("close", () => {
+    const usuarioQueSeVa = clients.get(client);
+    if (!usuarioQueSeVa) return;
+
+    clients.delete(client);
+
+    if (usuarioQueSeVa.isHost && clients.size > 0) {
+      const nextClient = clients.keys().next().value;
+      clients.get(nextClient).isHost = true;
+      nextClient.send(JSON.stringify({ type: "host_status", isHost: true }));
+    }
+
+    broadcastUserList();
+  });
+});
+
+function broadcast(missatge) {
+  const data = typeof missatge === "string" ? missatge : JSON.stringify(missatge);
+  wsServer.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) client.send(data);
+  });
 }
 
-function enviarArxiu(resposta, dades, cType, err) {
-  if (err) {
-    header(resposta, 400, "text/html");
-    resposta.end("<p style='text-align:center;font-size:1.2rem;font-weight:bold;color:red'>Error al l legir l'arxiu</p>");
+function broadcastUserList() {
+  const users = Array.from(clients.values()).map(c => ({ nickname: c.nickname, isHost: c.isHost }));
+  broadcast({ type: 'user_list', users });
+}
+
+function randomNickname() {
+  let nums = "";
+  for (let i = 0; i < 5; i++) nums += Math.floor(Math.random() * 5);
+  return "Anònim" + nums;
+}
+
+function startGame(letter) {
+  gameState = 'started';
+  gameData = {};
+  votes = {};
+  currentCategoryIndex = 0;
+
+  categoriesInPlay = [...CATEGORIAS_POOL].sort(() => 0.5 - Math.random()).slice(0, 9);
+  broadcast({ type: "start_game", letter, categories: categoriesInPlay });
+}
+
+function startVotingRound(index) {
+  if (index >= categoriesInPlay.length) {
+    calculateFinalScores();
     return;
   }
 
-  header(resposta, 200, cType);
-  resposta.write(dades);
-  resposta.end();
+  currentCategoryIndex = index;
+  confirmations = 0;
+
+  broadcast({ type: "start_voting_round", category: categoriesInPlay[index], answers: gameData });
+
+  votingTimeout = setTimeout(() => startVotingRound(index + 1), 15000);
 }
 
-function onRequest(peticio, resposta) {
-  let cosPeticio = "";
+function calculateFinalScores() {
+  clients.forEach(user => user.points = 0);
 
-  peticio
-    .on("error", function (err) {
-      console.error(err);
-    })
-    .on("data", function (dades) {
-      cosPeticio += dades;
-    })
-    .on("end", function () {
-      resposta.on("error", function (err) {
-        console.error(err);
-      });
+  Object.keys(gameData).forEach(playerNick => {
+    Object.keys(gameData[playerNick]).forEach(catName => {
+      const answer = gameData[playerNick][catName];
+      if (!answer || answer.trim() === '') return;
 
-      if (peticio.method == "GET") {
-        const q = new URL(peticio.url, "http://" + peticio.headers.host);
-        let filename = "./public" + q.pathname;
+      const wordVotes = votes[playerNick]?.[catName];
+      let isValid = true;
 
-        if (filename == "./public/") filename += "index.html";
-        if (existsSync(filename)) {
-          const cType = MIME_TYPES[extname(filename)] || "application/octet-stream";
-          readFile(filename, function (err, dades) {
-            enviarArxiu(resposta, dades, cType, err);
-          });
-        } else {
-          header(resposta, 404, "text/html");
-          resposta.end(
-            "<p style='text-align:center;font-size:1.2rem;font-weight:bold;color:red'>404 Not Found</p>",
-          );
-        }
+      if (wordVotes) {
+        let pos = 0, neg = 0;
+        wordVotes.voters.forEach(val => val ? pos++ : neg++);
+        if (neg > pos) isValid = false;
+      }
+
+      if (isValid) {
+        const clientEntry = Array.from(clients.values()).find(u => u.nickname === playerNick);
+        if (clientEntry) clientEntry.points += 100;
       }
     });
+  });
+
+  const results = Array.from(clients.values())
+    .map(u => ({ nickname: u.nickname, points: u.points }))
+    .sort((a, b) => b.points - a.points);
+
+  broadcast({ type: "final_results", results });
 }
 
-let server = createServer();
-server.on("request", onRequest);
+const server = createServer((peticio, resposta) => {
+  peticio.on("error", console.error).on("data", () => { }).on("end", () => {
+    resposta.on("error", console.error);
+
+    if (peticio.method === "GET") {
+      const q = new URL(peticio.url, "http://" + peticio.headers.host);
+      let filename = "./public" + q.pathname;
+      if (filename === "./public/") filename += "index.html";
+
+      if (existsSync(filename)) {
+        const cType = MIME_TYPES[extname(filename)] || "application/octet-stream";
+        readFile(filename, (err, dades) => {
+          if (err) {
+            resposta.writeHead(400, { "Content-Type": "text/html" });
+            resposta.end("<p>Error al llegir l'arxiu</p>");
+            return;
+          }
+          resposta.setHeader("Access-Control-Allow-Origin", "*");
+          resposta.writeHead(200, { "Content-Type": cType });
+          resposta.end(dades);
+        });
+      } else {
+        resposta.writeHead(404, { "Content-Type": "text/html" });
+        resposta.end("<p>404 Not Found</p>");
+      }
+    }
+  });
+});
 
 server.listen(8080);
-console.log("📦 Servidor (Backend): http://localhost:8080");
+console.log("WS: ws://localhost:8180");
+console.log("HTTP: http://localhost:8080");

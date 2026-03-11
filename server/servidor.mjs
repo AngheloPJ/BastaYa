@@ -136,7 +136,7 @@ function randomNickname() {
 function broadcastUserList() {
   const users = Array.from(clients.values()).map(c => ({
     nickname: c.nickname,
-    isHost: c.isHost
+    isHost: c.isHost // Esta propiedad es la clave
   }));
 
   broadcast({ type: 'user_list', users });
@@ -165,6 +165,14 @@ function broadcastWords() {
   broadcast({ type: "update_words", gameData });
 }
 
+
+// Lista de categorías posibles
+const CATEGORIAS_POOL = [
+  "Marcas", "Vehículos", "Comida", "Título de canción/película/libro",
+  "Animales", "Países o Ciudades", "Nombres de persona", "Profesiones",
+  "Objetos de casa", "Colores", "Frutas o Verduras", "Deportes",
+  "Personajes Famosos", "Ropa", "Partes del cuerpo", "Superhéroes"
+];
 /**
  * Funció per inicialitzar el joc amb la lletra corresponent
  * @param {*} letter La lletra que es jugará en la partida.
@@ -172,7 +180,17 @@ function broadcastWords() {
 function startGame(letter) {
   gameState = GameState.STARTED;
   gameData = {};
-  broadcast({ type: "start_game", letter });
+
+  // Seleccionamos 9 categorías aleatorias sin repetir
+  const categoriasSeleccionadas = [...CATEGORIAS_POOL]
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 9);
+
+  broadcast({
+    type: "start_game",
+    letter: letter,
+    categories: categoriasSeleccionadas // Enviamos la lista a todos
+  });
 }
 
 /**

@@ -1,4 +1,4 @@
-const connexio = new WebSocket('ws://localhost:8180');
+const connexio = new WebSocket('ws://10.92.254.149:8180');
 const playButton = document.getElementById('playButton');
 const nicknameInput = document.getElementById('playerName');
 const playerList = document.getElementById('playerList');
@@ -7,6 +7,7 @@ const chatInput = document.getElementById('chatInput');
 const sendChatButton = document.getElementById('sendChatButton');
 const startGameButton = document.getElementById('startGameButton');
 const gameplayerList = document.getElementById('game-playerList');
+const bastaYaButton = document.getElementById('bastaYaButton');
 playButton.addEventListener('click', play);
 startGameButton.addEventListener('click', () => {
     connexio.send(JSON.stringify({ type: 'start_game_request' }));
@@ -25,8 +26,11 @@ connexio.addEventListener('message', (event) => {
         gameplayerList.innerHTML = '';
         data.users.forEach((user) => {
             const li = document.createElement('li');
-            li.textContent = "-> " + user.nickname;
+            // Si el usuario es host, le ponemos la corona
+            const crown = user.isHost ? ' 👑' : '';
+            li.textContent = `• ${user.nickname} ${crown}`;
             playerList.appendChild(li);
+            // Clonamos para la lista que aparece dentro del juego también
             gameplayerList.appendChild(li.cloneNode(true));
         });
     }
@@ -44,7 +48,33 @@ connexio.addEventListener('message', (event) => {
         const letterElement = document.getElementById('currentLetter');
         if (letterElement)
             letterElement.textContent = data.letter;
-        showPage("game"); // Cambiamos a la pantalla de juego
+        // 1. Limpiar y habilitar inputs de categorías
+        const inputs = document.querySelectorAll('.categoryInput');
+        const labels = document.querySelectorAll('.categoryLabel');
+        data.categories.forEach((cat, index) => {
+            if (labels[index])
+                labels[index].textContent = cat;
+            if (inputs[index]) {
+                inputs[index].value = '';
+                inputs[index].disabled = false;
+            }
+        });
+        // 2. Lógica del botón "Basta Ya" con retraso de 10 segundos
+        bastaYaButton.disabled = true; // Empieza deshabilitado
+        let segundosRestantes = 10;
+        bastaYaButton.innerText = `Basta Ya (${segundosRestantes}s)`;
+        const countdown = setInterval(() => {
+            segundosRestantes--;
+            if (segundosRestantes > 0) {
+                bastaYaButton.innerText = `Basta Ya (${segundosRestantes}s)`;
+            }
+            else {
+                clearInterval(countdown);
+                bastaYaButton.disabled = false; // Se habilita tras 10s
+                bastaYaButton.innerText = "¡Basta Ya!";
+            }
+        }, 1000);
+        showPage("game");
     }
 });
 function play() {

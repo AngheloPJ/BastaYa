@@ -393,7 +393,7 @@ body {
     flex-shrink: 0;
 }
 
-#actionButton {
+#confirmButton {
     padding: 14px 60px;
     background-color: #af4c4c;
     color: white;
@@ -405,8 +405,8 @@ body {
     transition: background-color 0.2s;
 }
 
-#actionButton:hover { background-color: #ff2121; }
-#actionButton:disabled { opacity: 0.6; cursor: not-allowed; }
+#confirmButton:hover { background-color: #ff2121; }
+#confirmButton:disabled { opacity: 0.6; cursor: not-allowed; }
 
 
 /* ===================== PÁGINA: PUNTUACIÓN ===================== */
@@ -526,3 +526,14 @@ body {
 }
 
 #playAgainButton:hover { background-color: #ff2121; }
+
+.answerButton.correct {
+    background-color: #d4edda;
+    border: 2px solid #28a745;
+}
+
+.answerButton.incorrect {
+    background-color: #f8d7da;
+    border: 2px solid #dc3545;
+    text-decoration: line-through;
+}

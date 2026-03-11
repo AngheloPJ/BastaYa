@@ -10,6 +10,14 @@ const clients = new Map();
 const wsServer = new WebSocketServer({ port: 8180 });
 console.log("📦 Servidor WS (Nodo): http://localhost:8180");
 
+let currentCategoryIndex = 0;
+let categoriesInPlay = [];
+let votes = {};
+let confirmations = 0;
+let respuestasRecibidas = 0;
+let esperandoRespuestas = false;
+
+
 /**
  * Listener de nueva connexió
  * Es dispara quan un client es conecta
@@ -50,6 +58,39 @@ wsServer.on("connection", (client, req) => {
 
       broadcast(JSON.stringify({ type: "update_nickname", nickname: data.nickname }));
       broadcastUserList();
+    }
+
+    const usuario = clients.get(client);
+
+    if (data.type === 'submit_answers') {
+      // Guardamos las respuestas del jugador (sea o no el que paró)
+      gameData[usuario.nickname] = data.answers;
+
+      // Si es el primero en pulsar "Basta Ya"
+      if (gameState === GameState.STARTED && !esperandoRespuestas) {
+        esperandoRespuestas = true;
+        // Avisamos a todos que se acabó el tiempo para escribir
+        broadcast({ type: "stop_game", winner: usuario.nickname });
+
+        // ESPERAMOS 2 SEGUNDOS antes de empezar las votaciones
+        // para que los 'submit_answers' de los demás tengan tiempo de llegar
+        setTimeout(() => {
+          esperandoRespuestas = false;
+          gameState = GameState.FINISHED;
+          startVotingRound(0); // Empezamos con la primera categoría
+        }, 2000);
+      }
+    }
+
+    if (data.type === 'confirm_vote') {
+      confirmations++;
+
+      // Si todos han confirmado (o la mayoría, depende de tu lógica)
+      if (confirmations >= clients.size) {
+        console.log("Todos confirmaron. Saltando a la siguiente sección...");
+        clearTimeout(votingTimeout); // CANCELAMOS los 15 segundos
+        startVotingRound(currentCategoryIndex + 1); // Saltamos ya
+      }
     }
 
     if (data.type == 'chat_message') {
@@ -177,20 +218,49 @@ const CATEGORIAS_POOL = [
  * Funció per inicialitzar el joc amb la lletra corresponent
  * @param {*} letter La lletra que es jugará en la partida.
  */
+
 function startGame(letter) {
   gameState = GameState.STARTED;
   gameData = {};
+  votes = {};
+  currentCategoryIndex = 0;
 
-  // Seleccionamos 9 categorías aleatorias sin repetir
-  const categoriasSeleccionadas = [...CATEGORIAS_POOL]
+  categoriesInPlay = [...CATEGORIAS_POOL]
     .sort(() => 0.5 - Math.random())
     .slice(0, 9);
 
+  broadcast({ type: "start_game", letter, categories: categoriesInPlay });
+}
+
+function endGame(winner) {
+  gameState = GameState.FINISHED;
+  broadcast({ type: "stop_game", winner, gameData });
+
+  // Iniciamos la primera ronda de votación tras un pequeño delay
+  setTimeout(() => startVotingRound(0), 2000);
+}
+
+let votingTimeout;
+function startVotingRound(index) {
+  if (index >= categoriesInPlay.length) {
+    broadcast({ type: "show_final_scores" });
+    return;
+  }
+
+  currentCategoryIndex = index;
+  confirmations = 0;
+  const category = categoriesInPlay[index];
+
   broadcast({
-    type: "start_game",
-    letter: letter,
-    categories: categoriasSeleccionadas // Enviamos la lista a todos
+    type: "start_voting_round",
+    category: category,
+    answers: gameData
   });
+
+  // Guardamos el timeout para poder cancelarlo si le dan a confirmar
+  votingTimeout = setTimeout(() => {
+    startVotingRound(index + 1);
+  }, 15000);
 }
 
 /**
@@ -207,15 +277,7 @@ function sendWord(client, field, word) {
   gameData[nickname][field] = word;
 }
 
-/**
- * Funció per finalitzar el joc i mostrar totes les paraulas
- * @param {*} winner El jugador que ha guanyat
- */
-function endGame(winner) {
-  gameState = GameState.FINISHED;
-  broadcast({ type: "show_all_words", gameData });
-  broadcast({ type: "stop_game", winner })
-}
+
 
 /*
 ─────────────────────────────

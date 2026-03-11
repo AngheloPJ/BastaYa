@@ -15,6 +15,21 @@ startGameButton.addEventListener('click', () => {
     connexio.send(JSON.stringify({ type: 'start_game_request' }));
 });
 
+bastaYaButton.addEventListener('click', () => {
+    const inputs = document.querySelectorAll('.categoryInput') as NodeListOf<HTMLInputElement>;
+    const labels = document.querySelectorAll('.categoryLabel');
+    const answers: { [key: string]: string } = {};
+
+    inputs.forEach((input, index) => {
+        const category = labels[index].textContent || `cat${index}`;
+        answers[category] = input.value.trim();
+        input.disabled = true;
+    });
+
+    connexio.send(JSON.stringify({ type: 'submit_answers', answers }));
+    bastaYaButton.disabled = true;
+});
+
 function showPage(pageId: string) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     if (document.getElementById('page-' + pageId) !== null) {
@@ -58,7 +73,6 @@ connexio.addEventListener('message', (event) => {
         const letterElement = document.getElementById('currentLetter');
         if (letterElement) letterElement.textContent = data.letter;
 
-        // 1. Limpiar y habilitar inputs de categorías
         const inputs = document.querySelectorAll('.categoryInput') as NodeListOf<HTMLInputElement>;
         const labels = document.querySelectorAll('.categoryLabel');
 
@@ -70,7 +84,6 @@ connexio.addEventListener('message', (event) => {
             }
         });
 
-        // 2. Lógica del botón "Basta Ya" con retraso de 10 segundos
         bastaYaButton.disabled = true; // Empieza deshabilitado
         let segundosRestantes = 10;
         bastaYaButton.innerText = `Basta Ya (${segundosRestantes}s)`;
@@ -87,6 +100,75 @@ connexio.addEventListener('message', (event) => {
         }, 1000);
 
         showPage("game");
+    }
+
+    if (data.type === 'stop_game') {
+        // 1. Bloquear edición inmediatamente
+        const inputs = document.querySelectorAll('.categoryInput') as NodeListOf<HTMLInputElement>;
+        const labels = document.querySelectorAll('.categoryLabel');
+        const answers: { [key: string]: string } = {};
+
+        // 2. Recoger lo que el usuario tenga escrito hasta ese momento
+        inputs.forEach((input, index) => {
+            const category = labels[index].textContent || `cat${index}`;
+            answers[category] = input.value.trim();
+            input.disabled = true;
+        });
+
+        // 3. ENVIAR AL SERVIDOR (Esto lo hacen todos los jugadores ahora)
+        connexio.send(JSON.stringify({ type: 'submit_answers', answers }));
+
+        alert(`¡BASTA YA! El tiempo se ha agotado.`);
+    }
+
+    if (data.type === 'start_voting_round') {
+        showPage("voting");
+
+        // 1. Mostrar el nombre de la sección (categoría)
+        const categoryTitle = document.getElementById('categoryName'); // Asegúrate que este ID existe en el HTML
+        if (categoryTitle) {
+            categoryTitle.textContent = data.category;
+        }
+
+        const answersGrid = document.getElementById('answersGrid');
+        const confirmBtn = document.getElementById('confirmButton') as HTMLButtonElement; // Cambia el ID si es necesario
+
+        if (answersGrid) {
+            answersGrid.innerHTML = ''; // Limpiamos solo las palabras
+
+            Object.keys(data.answers).forEach(playerNick => {
+                const answer = data.answers[playerNick][data.category];
+                if (answer && answer.trim() !== "") {
+                    const btn = document.createElement('button');
+                    btn.className = 'answerButton correct';
+                    btn.textContent = answer;
+
+                    let isCorrect = true;
+                    btn.onclick = () => {
+                        isCorrect = !isCorrect;
+                        btn.className = isCorrect ? 'answerButton correct' : 'answerButton incorrect';
+                        connexio.send(JSON.stringify({
+                            type: 'vote_word',
+                            targetPlayer: playerNick,
+                            category: data.category,
+                            isCorrect: isCorrect
+                        }));
+                    };
+                    answersGrid.appendChild(btn);
+                }
+            });
+        }
+
+        // 2. Arreglar el botón de Confirmar
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = "Confirmar";
+            confirmBtn.onclick = () => {
+                confirmBtn.disabled = true;
+                confirmBtn.innerText = "Esperando...";
+                connexio.send(JSON.stringify({ type: 'confirm_vote' }));
+            };
+        }
     }
 });
 

@@ -39,15 +39,30 @@ wsServer.on("connection", (client, req) => {
     }
 
     if (data.type === 'set_nickname') {
-      clients.set(client, data.nickname);
-      // notify everyone that a nickname changed and send fresh list
+      // 1. Obtenemos el objeto actual del cliente
+      const usuari = clients.get(client);
+
+      if (usuari) {
+        // 2. Actualizamos solo el nombre
+        usuari.nickname = data.nickname;
+        clients.set(client, usuari);
+      }
+
       broadcast(JSON.stringify({ type: "update_nickname", nickname: data.nickname }));
       broadcastUserList();
     }
 
     if (data.type == 'chat_message') {
-      const nickname = clients.get(client) || nomAleatori;
-      broadcast(JSON.stringify({ type: "chat_message", nickname, message: data.message, time: Date.now() }));
+      const userData = clients.get(client);
+      // Extraemos el nickname del objeto, o usamos el temporal si no tiene
+      const nickname = userData ? userData.nickname : nomAleatori;
+
+      broadcast(JSON.stringify({
+        type: "chat_message",
+        nickname,
+        message: data.message,
+        time: Date.now()
+      }));
     }
 
     if (data.type === "veto_words") {
@@ -55,6 +70,37 @@ wsServer.on("connection", (client, req) => {
       broadcast({ type: "vetoed_words", words: vetoedWords });
     }
 
+    if (data.type === 'start_game_request') {
+      const usuari = clients.get(client);
+      if (usuari && usuari.isHost) {
+        const lletres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const lletraAleatoria = lletres[Math.floor(Math.random() * lletres.length)];
+
+        startGame(lletraAleatoria);
+      }
+    }
+
+  });
+
+  client.on("close", () => {
+    const usuarioQueSeVa = clients.get(client);
+
+    if (usuarioQueSeVa) {
+      console.log(`${usuarioQueSeVa.nickname} se ha desconectado.`);
+
+      clients.delete(client);
+
+      broadcast(`${usuarioQueSeVa.nickname} ha abandonado la sala.`);
+
+      if (usuarioQueSeVa.isHost && clients.size > 0) {
+        const nextClient = clients.keys().next().value;
+        const nextUserData = clients.get(nextClient);
+        nextUserData.isHost = true;
+        nextClient.send(JSON.stringify({ type: "host_status", isHost: true }));
+      }
+
+      broadcastUserList();
+    }
   });
 });
 

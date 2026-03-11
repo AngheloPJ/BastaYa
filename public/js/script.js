@@ -6,7 +6,11 @@ const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendChatButton = document.getElementById('sendChatButton');
 const startGameButton = document.getElementById('startGameButton');
+const gameplayerList = document.getElementById('game-playerList');
 playButton.addEventListener('click', play);
+startGameButton.addEventListener('click', () => {
+    connexio.send(JSON.stringify({ type: 'start_game_request' }));
+});
 function showPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     if (document.getElementById('page-' + pageId) !== null) {
@@ -18,11 +22,29 @@ connexio.addEventListener('message', (event) => {
     const data = JSON.parse(event.data);
     if (data.type === 'user_list') {
         playerList.innerHTML = '';
+        gameplayerList.innerHTML = '';
         data.users.forEach((user) => {
             const li = document.createElement('li');
-            li.textContent = user.nickname;
+            li.textContent = "-> " + user.nickname;
             playerList.appendChild(li);
+            gameplayerList.appendChild(li.cloneNode(true));
         });
+    }
+    if (data.type === 'chat_message') {
+        chatMessages.value += `${data.nickname}: ${data.message}\n`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    if (data.type === 'host_status') {
+        startGameButton.disabled = !data.isHost; // Se habilita solo si isHost es true
+        if (data.isHost) {
+            startGameButton.innerText = "Iniciar Juego";
+        }
+    }
+    if (data.type === 'start_game') {
+        const letterElement = document.getElementById('currentLetter');
+        if (letterElement)
+            letterElement.textContent = data.letter;
+        showPage("game"); // Cambiamos a la pantalla de juego
     }
 });
 function play() {
@@ -35,3 +57,17 @@ function play() {
 export function getConnexio() {
     return connexio;
 }
+sendChatButton.addEventListener('click', () => {
+    const message = chatInput.value.trim();
+    if (message !== '') {
+        connexio.send(JSON.stringify({
+            type: 'chat_message',
+            message: message
+        }));
+        chatInput.value = '';
+    }
+});
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter')
+        sendChatButton.click();
+});

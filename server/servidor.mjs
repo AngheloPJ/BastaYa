@@ -3,9 +3,46 @@ import { createServer } from "http";
 import { existsSync, readFile } from "fs";
 import { extname } from "path";
 
+const server = createServer((peticio, resposta) => {
+  peticio
+    .on("error", console.error)
+    .on("data", () => {})
+    .on("end", () => {
+      resposta.on("error", console.error);
+
+      if (peticio.method === "GET") {
+        const q = new URL(peticio.url, "http://" + peticio.headers.host);
+        let filename = "./public" + q.pathname;
+        if (filename === "./public/") filename += "index.html";
+
+        if (existsSync(filename)) {
+          const cType =
+            MIME_TYPES[extname(filename)] || "application/octet-stream";
+          readFile(filename, (err, dades) => {
+            if (err) {
+              resposta.writeHead(400, { "Content-Type": "text/html" });
+              resposta.end("<p>Error al llegir l'arxiu</p>");
+              return;
+            }
+            resposta.setHeader("Access-Control-Allow-Origin", "*");
+            resposta.writeHead(200, { "Content-Type": cType });
+            resposta.end(dades);
+          });
+        } else {
+          resposta.writeHead(404, { "Content-Type": "text/html" });
+          resposta.end("<p>404 Not Found</p>");
+        }
+      }
+    });
+});
+
+server.listen(PORT, () => {
+  console.log("SERVER: Running on port", PORT);
+});
+
 const wsServer = new WebSocketServer({ server });
-const clients = new Map();
 const PORT = process.env.PORT || 8080;
+const clients = new Map();
 
 let gameState = "waiting";
 let gameData = {};
@@ -51,10 +88,10 @@ wsServer.on("connection", (client) => {
   const nomAleatori = randomNickname();
   const isFirst = clients.size === 0;
   clients.set(client, { nickname: nomAleatori, isHost: isFirst, points: 0 });
-
+  
   client.send(JSON.stringify({ type: "host_status", isHost: isFirst }));
   broadcastUserList();
-
+  
   client.on("message", (missatge) => {
     let data;
     try {
@@ -62,15 +99,15 @@ wsServer.on("connection", (client) => {
     } catch {
       return;
     }
-
+    
     const usuario = clients.get(client);
-
+    
     if (data.type === "set_nickname") {
       usuario.nickname = data.nickname;
       clients.set(client, usuario);
       broadcastUserList();
     }
-
+    
     if (data.type === "chat_message") {
       broadcast({
         type: "chat_message",
@@ -78,12 +115,12 @@ wsServer.on("connection", (client) => {
         message: data.message,
       });
     }
-
+    
     if (data.type === "start_game_request" && usuario.isHost) {
       const lletres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       startGame(lletres[Math.floor(Math.random() * lletres.length)]);
     }
-
+    
     if (data.type === "return_to_lobby" && usuario.isHost) {
       gameState = "waiting";
       gameData = {};
@@ -95,14 +132,14 @@ wsServer.on("connection", (client) => {
       clients.forEach((u) => (u.points = 0));
       broadcast({ type: "return_to_lobby" });
     }
-
+    
     if (data.type === "submit_answers") {
       gameData[usuario.nickname] = data.answers;
-
+      
       if (gameState === "started" && !esperandoRespuestas) {
         esperandoRespuestas = true;
         broadcast({ type: "stop_game", winner: usuario.nickname });
-
+        
         setTimeout(() => {
           esperandoRespuestas = false;
           gameState = "finished";
@@ -110,7 +147,7 @@ wsServer.on("connection", (client) => {
         }, 2000);
       }
     }
-
+    
     if (data.type === "vote_word") {
       const { targetPlayer, category, isCorrect } = data;
       if (!votes[targetPlayer]) votes[targetPlayer] = {};
@@ -229,40 +266,3 @@ function calculateFinalScores() {
 
   broadcast({ type: "final_results", results });
 }
-
-const server = createServer((peticio, resposta) => {
-  peticio
-    .on("error", console.error)
-    .on("data", () => {})
-    .on("end", () => {
-      resposta.on("error", console.error);
-
-      if (peticio.method === "GET") {
-        const q = new URL(peticio.url, "http://" + peticio.headers.host);
-        let filename = "./public" + q.pathname;
-        if (filename === "./public/") filename += "index.html";
-
-        if (existsSync(filename)) {
-          const cType =
-            MIME_TYPES[extname(filename)] || "application/octet-stream";
-          readFile(filename, (err, dades) => {
-            if (err) {
-              resposta.writeHead(400, { "Content-Type": "text/html" });
-              resposta.end("<p>Error al llegir l'arxiu</p>");
-              return;
-            }
-            resposta.setHeader("Access-Control-Allow-Origin", "*");
-            resposta.writeHead(200, { "Content-Type": cType });
-            resposta.end(dades);
-          });
-        } else {
-          resposta.writeHead(404, { "Content-Type": "text/html" });
-          resposta.end("<p>404 Not Found</p>");
-        }
-      }
-    });
-});
-
-server.listen(PORT, () => {
-  console.log("SERVER: Running on port", PORT);
-});

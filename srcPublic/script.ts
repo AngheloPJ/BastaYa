@@ -1,4 +1,5 @@
-const connexio = new WebSocket('ws://10.92.254.149:8180');
+const protocol = location.protocol === "https:" ? "wss" : "ws";
+const connexio = new WebSocket(`${protocol}://${location.host}`);
 
 const playButton = document.getElementById('playButton') as HTMLButtonElement;
 const nicknameInput = document.getElementById('playerName') as HTMLInputElement;

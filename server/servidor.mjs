@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { existsSync, readFile } from "fs";
 import { extname } from "path";
 
+const PORT = process.env.PORT || 8080;
 const server = createServer((peticio, resposta) => {
   peticio
     .on("error", console.error)
@@ -36,13 +37,13 @@ const server = createServer((peticio, resposta) => {
     });
 });
 
+
+const wsServer = new WebSocketServer({ server });
+const clients = new Map();
+
 server.listen(PORT, () => {
   console.log("SERVER: Running on port", PORT);
 });
-
-const wsServer = new WebSocketServer({ server });
-const PORT = process.env.PORT || 8080;
-const clients = new Map();
 
 let gameState = "waiting";
 let gameData = {};

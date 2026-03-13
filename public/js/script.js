@@ -67,11 +67,13 @@ function showPage(pageId) {
 }
 function play() {
     if (nicknameInput.value.trim() !== '')
+    if (nicknameInput.value.trim() !== '')
         connexio.send(JSON.stringify({ type: 'set_nickname', nickname: nicknameInput.value }));
     showPage('lobby');
 }
 connexio.addEventListener('message', (event) => {
     const data = JSON.parse(event.data);
+    if (data.type === 'return_to_lobby')
     if (data.type === 'return_to_lobby')
         showPage('lobby');
     if (data.type === 'user_list') {

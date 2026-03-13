@@ -85,6 +85,8 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
+let lletresJugades = [];
+
 wsServer.on("connection", (client) => {
   const nomAleatori = randomNickname();
   const isFirst = clients.size === 0;
@@ -105,6 +107,8 @@ wsServer.on("connection", (client) => {
     
     if (data.type === "set_nickname") {
       usuario.nickname = data.nickname;
+      if (data.nickname.length > 20) return;
+
       clients.set(client, usuario);
       broadcastUserList();
     }
@@ -119,7 +123,13 @@ wsServer.on("connection", (client) => {
     
     if (data.type === "start_game_request" && usuario.isHost) {
       const lletres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      startGame(lletres[Math.floor(Math.random() * lletres.length)]);
+      let lletra = lletres[Math.floor(Math.random() * lletres.length)];
+
+      while(lletresJugades.includes(lletra)) lletra = lletres[Math.floor(Math.random() * lletres.length)];
+      lletresJugades.push(lletra);
+      if (lletresJugades.length > 5) lletresJugades.pop();
+
+      startGame(lletra);
     }
     
     if (data.type === "return_to_lobby" && usuario.isHost) {

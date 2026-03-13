@@ -49,24 +49,43 @@ chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendChatButton.click();
 });
 
+nicknameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        play();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+
+    const menuPageActive = document.getElementById('page-menu')?.classList.contains('active');
+    const lobbyPageActive = document.getElementById('page-lobby')?.classList.contains('active');
+
+    if (menuPageActive) {
+        e.preventDefault();
+        play();
+    }
+
+    if (lobbyPageActive && document.activeElement === chatInput) {
+        e.preventDefault();
+        sendChatButton.click();
+    }
+});
+
 function showPage(pageId: string) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-' + pageId)?.classList.add('active');
 }
 
 function play() {
-    if (nicknameInput.value.trim() !== '') {
-        connexio.send(JSON.stringify({ type: 'set_nickname', nickname: nicknameInput.value }));
-    }
+    if (nicknameInput.value.trim() !== '') connexio.send(JSON.stringify({ type: 'set_nickname', nickname: nicknameInput.value }));
     showPage('lobby');
 }
 
 connexio.addEventListener('message', (event) => {
     const data = JSON.parse(event.data);
-
-    if (data.type === 'return_to_lobby') {
-        showPage('lobby');
-    }
+    if (data.type === 'return_to_lobby') showPage('lobby');
 
     if (data.type === 'user_list') {
         playerList.innerHTML = '';

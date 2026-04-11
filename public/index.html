@@ -3,42 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>¡Basta Ya!</title>
+    <title>BASTA YA!</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-    <!-- ==================== MENÚ PRINCIPAL ==================== -->
+    <!-- MENÚ PRINCIPAL -->
     <div id="page-menu" class="page active">
         <div class="mainMenu">
-            <h1>¡Basta Ya!</h1>
-            <label for="playerName">Nombre del jugador:</label>
-            <input type="text" id="playerName" placeholder="Introduce tu nombre" maxlength="20">
-            <button id="playButton">Jugar</button>
+            <h1>BASTA YA!</h1>
+            <label for="playerName">Nom del jugador:</label>
+            <input type="text" id="playerName" placeholder="Introdueix el teu sobrenom" maxlength="20">
+            <label for="roomCode">Codi de la sala:</label>
+            <input type="text" id="roomCode" placeholder="Introdueix el codi de la sala" maxlength="6">
+            <div class="menuButtons">
+                <button id="playButton">UNIR-SE A SALA</button>
+                <button id="createRoomButton" type="button">CREAR SALA</button>
+            </div>
         </div>
     </div>
 
-    <!-- ==================== LOBBY ==================== -->
+    <!-- SALA DE ESPERA (LOBBY) -->
     <div id="page-lobby" class="page">
         <div class="lobby">
-            <h1>Lobby</h1>
-            <p>Esperando a que otros jugadores se unan...</p>
+            <h1>LOBBY</h1>
+            <p>CODI: <strong id="lobbyRoomCode">------</strong></p>
+            <p>ESPERANT QUE ALTRES JUGADORS S'UNEIXEN...</p>
             <div id="lobby-columnsRow">
                 <div id="playerCol">
                     <ul id="playerList"></ul>
                 </div>
                 <div id="chatCol">
                     <textarea id="chatMessages" readonly></textarea>
-                    <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
-                    <button id="sendChatButton">Enviar</button>
+                    <input type="text" id="chatInput" placeholder="Escriu un missatge...">
+                    <button id="sendChatButton">ENVIAR</button>
                 </div>
             </div>
-            <button id="startGameButton" disabled>Iniciar Juego</button>
+            <button id="startGameButton" disabled>COMENÇAR JOC</button>
         </div>
     </div>
 
-    <!-- ==================== JUEGO ==================== -->
+    <!-- PARTIDA (GAME) -->
     <div id="page-game" class="page">
+        <div id="gameRoomBadge">CODI: <strong id="gameRoomCode">------</strong></div>
         <div id="letterSection">
             <div id="letterCircle">
                 <span id="currentLetter">A</span>
@@ -46,7 +53,7 @@
         </div>
         <div id="game-columnsRow">
             <div id="game-playerCol">
-                <h3>Jugadores</h3>
+                <h3>JUGADORS</h3>
                 <ul id="game-playerList"></ul>
             </div>
             <div id="gameCol">
@@ -64,11 +71,11 @@
             </div>
         </div>
         <div id="game-buttonRow">
-            <button id="bastaYaButton" disabled>¡Basta Ya!</button>
+            <button id="bastaYaButton" disabled>BASTA YA!</button>
         </div>
     </div>
 
-    <!-- ==================== VOTACIÓN ==================== -->
+    <!-- VOTACIONES -->
     <div id="page-voting" class="page">
         <div id="votingPanel">
             <div id="categoryTitle">
@@ -84,21 +91,21 @@
             </div>
         </div>
         <div id="voting-buttonRow">
-            <button id="confirmButton">Confirmar</button>
+            <button id="confirmButton">CONFIRMAR</button>
         </div>
     </div>
 
-    <!-- ==================== PUNTUACIÓN FINAL ==================== -->
+    <!-- PUNTUACIÓN -->
     <div id="page-scores" class="page">
         <div id="scoresHeader">
-            <h1 id="scoresTitle">Puntuación Final</h1>
+            <h1 id="scoresTitle">PUNTUACIÓ FINAL</h1>
         </div>
         <div id="scoresPanel">
             <div id="scoresTable">
                 <div class="scoresRow header">
                     <div class="scoresCell rank">#</div>
-                    <div class="scoresCell player">Jugador</div>
-                    <div class="scoresCell points">Puntos</div>
+                    <div class="scoresCell player">SOBRENOM</div>
+                    <div class="scoresCell points">PUNTUACIÓ</div>
                 </div>
                 <div class="scoresRow" id="row1">
                     <div class="scoresCell rank">1</div>
@@ -128,8 +135,13 @@
             </div>
         </div>
         <div id="scores-buttonRow">
-            <button id="playAgainButton">Volver a Jugar</button>
+            <button id="playAgainButton">TORNAR A JUGAR</button>
         </div>
+    </div>
+
+    <!-- OVERLAY BASTA YA -->
+    <div id="bastaya-overlay">
+        <span id="bastaya-text">BASTA YA!</span>
     </div>
 
     <script type="module" src="js/script.js"></script>

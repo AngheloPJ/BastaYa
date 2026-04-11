@@ -40,19 +40,11 @@ const server = createServer((peticio, resposta) => {
 
 const wsServer = new WebSocketServer({ server });
 const clients = new Map();
+const rooms = new Map();
 
 server.listen(PORT, () => {
   console.log("SERVER: Running on port", PORT);
 });
-
-let gameState = "waiting";
-let gameData = {};
-let votes = {};
-let categoriesInPlay = [];
-let currentCategoryIndex = 0;
-let confirmations = 0;
-let esperandoRespuestas = false;
-let votingTimeout;
 
 const CATEGORIAS_POOL = [
   "Marcas",
@@ -85,127 +77,371 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
-let lletresJugades = [];
+const BASE_POINTS = 100;
+const DUPLICATE_POINTS = 50;
 
 wsServer.on("connection", (client) => {
   const nomAleatori = randomNickname();
-  const isFirst = clients.size === 0;
-  clients.set(client, { nickname: nomAleatori, isHost: isFirst, points: 0 });
-  
-  client.send(JSON.stringify({ type: "host_status", isHost: isFirst }));
-  broadcastUserList();
+  clients.set(client, {
+    nickname: nomAleatori,
+    isHost: false,
+    isSpectator: false,
+    points: 0,
+    roomCode: null,
+  });
+
+  client.send(JSON.stringify({ type: "host_status", isHost: false }));
   
   client.on("message", (missatge) => {
     let data;
     try {
-      data = JSON.parse(missatge);
+      data = JSON.parse(missatge.toString());
     } catch {
       return;
     }
     
     const usuario = clients.get(client);
+    if (!usuario) return;
+
+    if (data.type === "create_room_request") {
+      const nickname = String(data.nickname || "").trim();
+
+      const roomCode = generateRoomCode();
+      rooms.set(roomCode, createRoom(roomCode));
+      if (nickname !== "") usuario.nickname = nickname;
+      joinRoom(client, roomCode);
+      client.send(JSON.stringify({ type: "room_created", roomCode }));
+      return;
+    }
+
+    if (data.type === "join_room_request") {
+      const nickname = String(data.nickname || "").trim();
+      const roomCode = normalizeRoomCode(data.roomCode);
+
+      if (!roomCode) {
+        client.send(
+          JSON.stringify({
+            type: "error",
+            message: "Debes introducir el código de la sala.",
+          }),
+        );
+        return;
+      }
+
+      if (!rooms.has(roomCode)) {
+        client.send(
+          JSON.stringify({
+            type: "error",
+            message: "La sala no existe. Crea una o revisa el codigo.",
+          }),
+        );
+        return;
+      }
+
+      if (nickname !== "") usuario.nickname = nickname;
+      joinRoom(client, roomCode);
+      return;
+    }
+
+    const room = getClientRoom(client);
+    if (!room) return;
+    const activePlayers = getActiveRoomClients(room);
     
     if (data.type === "set_nickname") {
       usuario.nickname = data.nickname;
       if (data.nickname.length > 20) return;
 
       clients.set(client, usuario);
-      broadcastUserList();
+      broadcastUserList(room);
     }
     
     if (data.type === "chat_message") {
-      broadcast({
+      broadcastToRoom(room, {
         type: "chat_message",
         nickname: usuario.nickname,
         message: data.message,
       });
     }
     
-    if (data.type === "start_game_request" && usuario.isHost) {
+    if (data.type === "start_game_request" && usuario.isHost && !usuario.isSpectator) {
       const lletres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       let lletra = lletres[Math.floor(Math.random() * lletres.length)];
 
-      while(lletresJugades.includes(lletra)) lletra = lletres[Math.floor(Math.random() * lletres.length)];
-      lletresJugades.push(lletra);
-      if (lletresJugades.length > 5) lletresJugades.pop();
+      while (room.lletresJugades.includes(lletra)) {
+        lletra = lletres[Math.floor(Math.random() * lletres.length)];
+      }
+      room.lletresJugades.push(lletra);
+      if (room.lletresJugades.length > 5) room.lletresJugades.shift();
 
-      startGame(lletra);
+      startGame(room, lletra);
     }
     
     if (data.type === "return_to_lobby" && usuario.isHost) {
-      gameState = "waiting";
-      gameData = {};
-      votes = {};
-      currentCategoryIndex = 0;
-      confirmations = 0;
-      esperandoRespuestas = false;
-      clearTimeout(votingTimeout);
-      clients.forEach((u) => (u.points = 0));
-      broadcast({ type: "return_to_lobby" });
+      room.phase = "lobby";
+      room.gameState = "waiting";
+      room.gameData = {};
+      room.votes = {};
+      room.currentCategoryIndex = 0;
+      room.confirmations = 0;
+      room.esperandoRespuestas = false;
+      room.currentLetter = "";
+      room.currentVotingCategory = "";
+      room.finalResults = [];
+      clearTimeout(room.votingTimeout);
+
+      room.clients.forEach((c) => {
+        const user = clients.get(c);
+        if (user) {
+          user.points = 0;
+          user.isSpectator = false;
+        }
+      });
+
+      assignHost(room);
+      syncSpectatorStatus(room);
+      syncHostStatus(room);
+      broadcastToRoom(room, { type: "return_to_lobby" });
+      broadcastUserList(room);
     }
     
     if (data.type === "submit_answers") {
-      gameData[usuario.nickname] = data.answers;
+      if (usuario.isSpectator) return;
+
+      room.gameData[usuario.nickname] = data.answers;
       
-      if (gameState === "started" && !esperandoRespuestas) {
-        esperandoRespuestas = true;
-        broadcast({ type: "stop_game", winner: usuario.nickname });
+      if (room.gameState === "started" && !room.esperandoRespuestas) {
+        room.esperandoRespuestas = true;
+        broadcastToRoom(room, { type: "stop_game", winner: usuario.nickname });
         
         setTimeout(() => {
-          esperandoRespuestas = false;
-          gameState = "finished";
-          startVotingRound(0);
+          room.esperandoRespuestas = false;
+          room.gameState = "finished";
+          startVotingRound(room, 0);
         }, 2000);
       }
     }
     
     if (data.type === "vote_word") {
-      const { targetPlayer, category, isCorrect } = data;
-      if (!votes[targetPlayer]) votes[targetPlayer] = {};
-      if (!votes[targetPlayer][category])
-        votes[targetPlayer][category] = { voters: new Map() };
-      votes[targetPlayer][category].voters.set(client, isCorrect);
+      if (usuario.isSpectator) return;
+
+      const { category, isCorrect } = data;
+      const targets = Array.isArray(data.targetPlayers)
+        ? data.targetPlayers
+        : [data.targetPlayer];
+
+      targets.forEach((targetPlayer) => {
+        if (!targetPlayer) return;
+        if (!room.votes[targetPlayer]) room.votes[targetPlayer] = {};
+        if (!room.votes[targetPlayer][category]) {
+          room.votes[targetPlayer][category] = { voters: new Map() };
+        }
+        room.votes[targetPlayer][category].voters.set(client, isCorrect);
+      });
     }
 
     if (data.type === "confirm_vote") {
-      confirmations++;
-      if (confirmations >= clients.size) {
-        clearTimeout(votingTimeout);
-        startVotingRound(currentCategoryIndex + 1);
+      if (usuario.isSpectator) return;
+
+      room.confirmations++;
+      if (room.confirmations >= activePlayers.length) {
+        clearTimeout(room.votingTimeout);
+        startVotingRound(room, room.currentCategoryIndex + 1);
       }
     }
   });
 
   client.on("close", () => {
-    const usuarioQueSeVa = clients.get(client);
-    if (!usuarioQueSeVa) return;
-
+    leaveRoom(client);
     clients.delete(client);
-
-    if (usuarioQueSeVa.isHost && clients.size > 0) {
-      const nextClient = clients.keys().next().value;
-      clients.get(nextClient).isHost = true;
-      nextClient.send(JSON.stringify({ type: "host_status", isHost: true }));
-    }
-
-    broadcastUserList();
   });
 });
 
-function broadcast(missatge) {
+function createRoom(code) {
+  return {
+    code,
+    clients: new Set(),
+    phase: "lobby",
+    gameState: "waiting",
+    gameData: {},
+    votes: {},
+    categoriesInPlay: [],
+    currentCategoryIndex: 0,
+    confirmations: 0,
+    esperandoRespuestas: false,
+    votingTimeout: null,
+    lletresJugades: [],
+    currentLetter: "",
+    currentVotingCategory: "",
+    finalResults: [],
+  };
+}
+
+function normalizeRoomCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase();
+}
+
+function generateRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+
+  do {
+    code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+  } while (rooms.has(code));
+
+  return code;
+}
+
+function getClientRoom(client) {
+  const user = clients.get(client);
+  if (!user?.roomCode) return null;
+  return rooms.get(user.roomCode) || null;
+}
+
+function joinRoom(client, roomCode) {
+  const room = rooms.get(roomCode);
+  const user = clients.get(client);
+  if (!room || !user) return;
+
+  leaveRoom(client, false);
+
+  room.clients.add(client);
+  user.roomCode = roomCode;
+  user.points = 0;
+  user.isSpectator = room.phase !== "lobby";
+
+  assignHost(room);
+
+  client.send(JSON.stringify({
+    type: "room_joined",
+    roomCode,
+    nickname: user.nickname,
+    isSpectator: user.isSpectator,
+  }));
+  syncHostStatus(room);
+  broadcastUserList(room);
+  sendRoomSnapshot(client, room);
+}
+
+function leaveRoom(client, shouldDeleteClient = true) {
+  const user = clients.get(client);
+  if (!user?.roomCode) return;
+
+  const roomCode = user.roomCode;
+  const room = rooms.get(roomCode);
+  const wasHost = user.isHost;
+
+  user.roomCode = null;
+  user.isHost = false;
+  user.isSpectator = false;
+  user.points = 0;
+
+  if (!room) return;
+
+  room.clients.delete(client);
+
+  if (room.clients.size === 0) {
+    clearTimeout(room.votingTimeout);
+    rooms.delete(roomCode);
+    return;
+  }
+
+  if (wasHost) assignHost(room);
+
+  syncHostStatus(room);
+  broadcastUserList(room);
+
+  if (!shouldDeleteClient) {
+    client.send(JSON.stringify({ type: "host_status", isHost: false }));
+  }
+}
+
+function broadcastToRoom(room, missatge) {
   const data =
     typeof missatge === "string" ? missatge : JSON.stringify(missatge);
-  wsServer.clients.forEach((client) => {
+  room.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) client.send(data);
   });
 }
 
-function broadcastUserList() {
-  const users = Array.from(clients.values()).map((c) => ({
-    nickname: c.nickname,
-    isHost: c.isHost,
-  }));
-  broadcast({ type: "user_list", users });
+function syncHostStatus(room) {
+  room.clients.forEach((client) => {
+    const user = clients.get(client);
+    if (!user) return;
+    client.send(JSON.stringify({ type: "host_status", isHost: user.isHost }));
+  });
+}
+
+function syncSpectatorStatus(room) {
+  room.clients.forEach((client) => {
+    const user = clients.get(client);
+    if (!user) return;
+    client.send(
+      JSON.stringify({ type: "spectator_status", isSpectator: user.isSpectator }),
+    );
+  });
+}
+
+function broadcastUserList(room) {
+  const users = Array.from(room.clients)
+    .map((client) => clients.get(client))
+    .filter(Boolean)
+    .map((c) => ({
+      nickname: c.nickname,
+      isHost: c.isHost,
+      isSpectator: c.isSpectator,
+    }));
+  broadcastToRoom(room, { type: "user_list", users });
+}
+
+function getActiveRoomClients(room) {
+  return Array.from(room.clients).filter((client) => {
+    const user = clients.get(client);
+    return Boolean(user && !user.isSpectator);
+  });
+}
+
+function assignHost(room) {
+  room.clients.forEach((client) => {
+    const user = clients.get(client);
+    if (user) user.isHost = false;
+  });
+
+  const nextHost = getActiveRoomClients(room)[0] || room.clients.values().next().value;
+  const nextUser = clients.get(nextHost);
+  if (nextUser) nextUser.isHost = true;
+}
+
+function sendRoomSnapshot(client, room) {
+  if (room.phase === "game") {
+    client.send(
+      JSON.stringify({
+        type: "start_game",
+        letter: room.currentLetter,
+        categories: room.categoriesInPlay,
+      }),
+    );
+    return;
+  }
+
+  if (room.phase === "voting") {
+    client.send(
+      JSON.stringify({
+        type: "start_voting_round",
+        category: room.currentVotingCategory,
+        votingOptions: buildVotingOptions(room, room.currentVotingCategory),
+      }),
+    );
+    return;
+  }
+
+  if (room.phase === "scores") {
+    client.send(JSON.stringify({ type: "final_results", results: room.finalResults }));
+  }
 }
 
 function randomNickname() {
@@ -214,66 +450,133 @@ function randomNickname() {
   return "Anònim" + nums;
 }
 
-function startGame(letter) {
-  gameState = "started";
-  gameData = {};
-  votes = {};
-  currentCategoryIndex = 0;
+function startGame(room, letter) {
+  room.phase = "game";
+  room.gameState = "started";
+  room.gameData = {};
+  room.votes = {};
+  room.currentCategoryIndex = 0;
+  room.currentLetter = letter;
+  room.currentVotingCategory = "";
+  room.finalResults = [];
 
-  categoriesInPlay = [...CATEGORIAS_POOL]
+  room.categoriesInPlay = [...CATEGORIAS_POOL]
     .sort(() => 0.5 - Math.random())
     .slice(0, 9);
-  broadcast({ type: "start_game", letter, categories: categoriesInPlay });
+  broadcastToRoom(room, {
+    type: "start_game",
+    letter,
+    categories: room.categoriesInPlay,
+  });
 }
 
-function startVotingRound(index) {
-  if (index >= categoriesInPlay.length) {
-    calculateFinalScores();
+function startVotingRound(room, index) {
+  if (index >= room.categoriesInPlay.length) {
+    calculateFinalScores(room);
     return;
   }
 
-  currentCategoryIndex = index;
-  confirmations = 0;
+  room.phase = "voting";
+  room.currentCategoryIndex = index;
+  room.confirmations = 0;
+  room.currentVotingCategory = room.categoriesInPlay[index];
 
-  broadcast({
+  broadcastToRoom(room, {
     type: "start_voting_round",
-    category: categoriesInPlay[index],
-    answers: gameData,
+    category: room.currentVotingCategory,
+    votingOptions: buildVotingOptions(room, room.currentVotingCategory),
   });
 
-  votingTimeout = setTimeout(() => startVotingRound(index + 1), 15000);
+  room.votingTimeout = setTimeout(() => startVotingRound(room, index + 1), 15000);
 }
 
-function calculateFinalScores() {
-  clients.forEach((user) => (user.points = 0));
+function calculateFinalScores(room) {
+  getActiveRoomClients(room).forEach((client) => {
+    const user = clients.get(client);
+    if (user) user.points = 0;
+  });
 
-  Object.keys(gameData).forEach((playerNick) => {
-    Object.keys(gameData[playerNick]).forEach((catName) => {
-      const answer = gameData[playerNick][catName];
-      if (!answer || answer.trim() === "") return;
+  const duplicateCountsByCategory = {};
+  room.categoriesInPlay.forEach((category) => {
+    duplicateCountsByCategory[category] = {};
+    Object.keys(room.gameData).forEach((playerNick) => {
+      const answer = room.gameData[playerNick]?.[category];
+      if (!isMeaningfulAnswer(answer)) return;
+      const normalized = normalizeAnswer(answer);
+      duplicateCountsByCategory[category][normalized] =
+        (duplicateCountsByCategory[category][normalized] || 0) + 1;
+    });
+  });
 
-      const wordVotes = votes[playerNick]?.[catName];
+  Object.keys(room.gameData).forEach((playerNick) => {
+    Object.keys(room.gameData[playerNick]).forEach((catName) => {
+      const answer = room.gameData[playerNick][catName];
+      if (!isMeaningfulAnswer(answer)) return;
+
+      const wordVotes = room.votes[playerNick]?.[catName];
       let isValid = true;
 
       if (wordVotes) {
-        let pos = 0,
-          neg = 0;
-        wordVotes.voters.forEach((val) => (val ? pos++ : neg++));
-        if (neg > pos) isValid = false;
+        let neg = 0;
+        wordVotes.voters.forEach((val) => {
+          if (!val) neg++;
+        });
+
+        // Solo se veta si la mayoria de la sala lo marca como incorrecto.
+        if (neg > getActiveRoomClients(room).length / 2) isValid = false;
       }
 
       if (isValid) {
-        const clientEntry = Array.from(clients.values()).find(
-          (u) => u.nickname === playerNick,
-        );
-        if (clientEntry) clientEntry.points += 100;
+        const duplicateCount =
+          duplicateCountsByCategory[catName]?.[normalizeAnswer(answer)] || 1;
+        const pointsToAdd =
+          duplicateCount > 1 ? DUPLICATE_POINTS : BASE_POINTS;
+
+        const clientEntry = getActiveRoomClients(room)
+          .map((client) => clients.get(client))
+          .find((u) => u?.nickname === playerNick);
+        if (clientEntry) clientEntry.points += pointsToAdd;
       }
     });
   });
 
-  const results = Array.from(clients.values())
+  const results = getActiveRoomClients(room)
+    .map((client) => clients.get(client))
+    .filter(Boolean)
     .map((u) => ({ nickname: u.nickname, points: u.points }))
     .sort((a, b) => b.points - a.points);
 
-  broadcast({ type: "final_results", results });
+  room.phase = "scores";
+  room.finalResults = results;
+  broadcastToRoom(room, { type: "final_results", results });
+}
+
+function normalizeAnswer(answer) {
+  return String(answer || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isMeaningfulAnswer(answer) {
+  return normalizeAnswer(answer).length > 1;
+}
+
+function buildVotingOptions(room, category) {
+  const uniqueAnswers = new Map();
+
+  Object.keys(room.gameData).forEach((playerNick) => {
+    const answer = room.gameData[playerNick]?.[category];
+    if (!isMeaningfulAnswer(answer)) return;
+
+    const key = normalizeAnswer(answer);
+    if (!uniqueAnswers.has(key)) {
+      uniqueAnswers.set(key, {
+        answer: String(answer).trim(),
+        targetPlayers: [],
+      });
+    }
+    uniqueAnswers.get(key).targetPlayers.push(playerNick);
+  });
+
+  return Array.from(uniqueAnswers.values());
 }
